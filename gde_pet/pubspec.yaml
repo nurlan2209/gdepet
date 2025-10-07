@@ -32,6 +32,8 @@ dependencies:
   
   # Image Picker
   image_picker: ^1.1.2
+  geoflutterfire_plus: ^0.0.32
+  # GeoHash для геолокации
 
 dev_dependencies:
   flutter_test:

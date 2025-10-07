@@ -5,6 +5,7 @@ import 'package:gde_pet/features/auth/welcome_screen.dart';
 import 'package:gde_pet/features/main_nav_shell.dart';
 import 'package:gde_pet/providers/auth_provider.dart';
 import 'package:gde_pet/providers/profile_provider.dart';
+import 'package:gde_pet/providers/pet_provider.dart';
 import 'package:gde_pet/firebase_options.dart';
 
 void main() async {
@@ -24,6 +25,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
+        ChangeNotifierProvider(create: (_) => PetProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -63,12 +65,10 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
 
-    // Если пользователь авторизован или в гостевом режиме
     if (authProvider.isAuthenticated || authProvider.isGuest) {
       return const MainNavShell();
     }
 
-    // Иначе показываем экран приветствия
     return const WelcomeScreen();
   }
 }
