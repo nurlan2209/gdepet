@@ -172,13 +172,21 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
     if (mounted) {
       if (success) {
+        // Добавление: Обновляем список объявлений после создания
+        await petProvider.loadUserPets(authProvider.user!.uid); 
+        await petProvider.loadPetsByStatus(_selectedStatus); 
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Объявление создано'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
+        
+        // CRITICAL FIX: Возвращаемся к первой доступной навигации
+        // Это предотвратит черный экран, который может возникать при
+        // попытке закрыть модальный маршрут, который был заменен.
+        Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

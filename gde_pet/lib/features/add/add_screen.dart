@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../main_nav_shell.dart';
 import 'add_pet_screen.dart';
 
 class AddScreen extends StatelessWidget {
   const AddScreen({super.key});
 
+  void _openAddPetScreen(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddPetScreen()),
+    );
+    if (context.mounted) {
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Перенаправляем сразу на экран создания объявления
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AddPetScreen()),
-      );
+      _openAddPetScreen(context);
     });
 
     return const Scaffold(

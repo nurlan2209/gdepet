@@ -6,6 +6,7 @@ import 'package:gde_pet/features/main_nav_shell.dart';
 import 'package:gde_pet/providers/auth_provider.dart';
 import 'package:gde_pet/providers/profile_provider.dart';
 import 'package:gde_pet/providers/pet_provider.dart';
+import 'package:gde_pet/providers/favorites_provider.dart';
 import 'package:gde_pet/firebase_options.dart';
 
 void main() async {
@@ -26,6 +27,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => PetProvider()),
+        ChangeNotifierProvider(create: (_) => FavoritesProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

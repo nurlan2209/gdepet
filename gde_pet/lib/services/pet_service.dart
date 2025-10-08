@@ -46,6 +46,24 @@ class PetService {
     }
   }
 
+  // Получить все активные объявления
+  Future<List<PetModel>> getAllActivePets() async {
+    try {
+      final snapshot = await _firestore
+          .collection('pets')
+          .where('isActive', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => PetModel.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+    } catch (e) {
+      print('PetService (getAllActivePets) error: $e');
+      throw 'Ошибка загрузки объявлений: $e';
+    }
+  }
+
   // Получить объявления по статусу
   Future<List<PetModel>> getPetsByStatus(PetStatus status) async {
     try {

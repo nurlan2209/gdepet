@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 import 'analytics_screen.dart';
 import 'edit_profile_screen.dart';
+import 'user_pets_screen.dart'; // <--- НОВЫЙ ИМПОРТ
 import '../auth/welcome_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -271,11 +272,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
               
+              // ИСПРАВЛЕНО: Теперь ведет на экран со списком объявлений пользователя
               _buildProfileMenuItem(
                 icon: Icons.pets_outlined,
                 text: 'Мои объявления',
                 onTap: () {
-                  // TODO: Реализовать позже
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const UserPetsScreen(), // <--- ВЫЗЫВАЕМ НОВЫЙ ЭКРАН
+                    ),
+                  );
                 },
               ),
               
@@ -325,6 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+ 
 
   Widget _buildStatsCard(profile) {
     return Container(
@@ -338,7 +346,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _buildStatItem(
             'Объявлений',
-            '${profile?.postsCount ?? 0}',
+            profile?.postsCount?.toString() ?? '0',
             Icons.pets,
           ),
           Container(
@@ -348,7 +356,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           _buildStatItem(
             'Найдено',
-            '${profile?.foundPetsCount ?? 0}',
+            profile?.foundPetsCount?.toString() ?? '0',
             Icons.check_circle,
           ),
         ],

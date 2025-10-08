@@ -102,6 +102,21 @@ class PetProvider extends ChangeNotifier {
     }
   }
 
+  // Загрузить все активные объявления
+  Future<void> loadPets() async {
+    try {
+      _setLoading(true);
+      _error = null;
+
+      _pets = await _petService.getAllActivePets();
+
+      _setLoading(false);
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+    }
+  }
+
   // Загрузить объявления по статусу
   Future<void> loadPetsByStatus(PetStatus status) async {
     try {
