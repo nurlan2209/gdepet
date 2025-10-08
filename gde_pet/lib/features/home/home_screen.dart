@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:gde_pet/features/home/pet_detail_screen.dart';
 import 'package:gde_pet/features/notifications/notifications_screen.dart';
-import 'package:provider/provider.dart'; // <--- ДОБАВЛЕНО
-import '../../providers/pet_provider.dart'; // <--- ДОБАВЛЕНО
-import '../../models/pet_model.dart'; // <--- ДОБАВЛЕНО
-import '../../providers/auth_provider.dart'; // <--- ДОБАВЛЕНО
+import 'package:provider/provider.dart';
+import '../../providers/pet_provider.dart';
+import '../../models/pet_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/favorites_provider.dart';
 
@@ -19,7 +19,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Запускаем первоначальную загрузку данных
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitialData();
     });
@@ -31,15 +30,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final profileProvider = context.read<ProfileProvider>();
     final favoritesProvider = context.read<FavoritesProvider>();
     
-    // Загружаем объявления 'Пропал'
-    await petProvider.loadPetsByStatus(PetStatus.lost);
+    // Загружаем ВСЕ активные объявления
+    await petProvider.loadPets();
     
-    // Загружаем профиль пользователя, если он авторизован
     if (authProvider.user != null && profileProvider.profile == null) {
       await profileProvider.loadProfile(authProvider.user!.uid);
     }
 
-    // Загружаем избранное, если пользователь авторизован
     if (authProvider.user != null) {
       await favoritesProvider.loadFavorites(authProvider.user!.uid);
     }
@@ -47,20 +44,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _refreshData() async {
     final petProvider = context.read<PetProvider>();
-    await petProvider.loadPetsByStatus(PetStatus.lost);
+    await petProvider.loadPets();
   }
 
   @override
   Widget build(BuildContext context) {
     final petProvider = context.watch<PetProvider>();
     final favoritesProvider = context.watch<FavoritesProvider>();
-    // Фильтруем данные по статусу для отображения в разных секциях
-    final lostPets = petProvider.pets.where((p) => p.status == PetStatus.lost).toList();
-    final foundPets = petProvider.pets.where((p) => p.status == PetStatus.found).toList();
+    
+    // Фильтруем по статусу ПОСЛЕ загрузки всех питомцев
+    final lostPets = petProvider.pets
+        .where((p) => p.status == PetStatus.lost && p.isActive)
+        .toList();
+    final foundPets = petProvider.pets
+        .where((p) => p.status == PetStatus.found && p.isActive)
+        .toList();
     
     return Scaffold(
       body: SafeArea(
-        child: RefreshIndicator( // <--- Обернули для обновления
+        child: RefreshIndicator(
           onRefresh: _refreshData,
           color: const Color(0xFFEE8A9A),
           child: ListView(
@@ -84,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final authProvider = context.watch<AuthProvider>();
     final profileProvider = context.watch<ProfileProvider>();
     
-    // Используем данные из профиля, если они есть, иначе из AuthProvider
     final userName = profileProvider.profile?.displayName ?? 
         authProvider.userModel?.displayName ?? 
         'Пользователь';
@@ -126,7 +127,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Обновлен для принятия списка PetModel
   Widget _buildHorizontalList(List<PetModel> pets, PetStatus status) {
     if (pets.isEmpty) {
       return Padding(
@@ -150,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, index) {
           final pet = pets[index];
           return PetCard(
-            petModel: pet, // Передаем объект модели
+            petModel: pet,
             color: pet.status == PetStatus.lost 
                 ? const Color(0xFFEE8A9A) 
                 : const Color(0xFFD6C9FF),
@@ -163,16 +163,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// PetCard обновлен для приема PetModel
 class PetCard extends StatelessWidget {
-  final PetModel petModel; // <--- НОВОЕ ПОЛЕ
+  final PetModel petModel;
   final Color color;
   final String title;
   final String location;
 
   const PetCard({
     super.key,
-    required this.petModel, // <--- НОВОЕ ТРЕБОВАНИЕ
+    required this.petModel,
     required this.color,
     required this.title,
     required this.location,
@@ -183,6 +182,7 @@ class PetCard extends StatelessWidget {
     final authProvider = context.watch<AuthProvider>();
     final favoritesProvider = context.watch<FavoritesProvider>();
     final isFav = favoritesProvider.isFavorite(petModel.id);
+    
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -206,7 +206,7 @@ class PetCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded( // Добавлено Expanded для предотвращения переполнения
+                Expanded(
                   child: Text(
                     title,
                     style: const TextStyle(
@@ -220,7 +220,10 @@ class PetCard extends StatelessWidget {
                 GestureDetector(
                   onTap: () async {
                     if (authProvider.user == null) return;
-                    await favoritesProvider.toggleFavorite(authProvider.user!.uid, petModel.id);
+                    await favoritesProvider.toggleFavorite(
+                      authProvider.user!.uid, 
+                      petModel.id,
+                    );
                   },
                   child: Icon(
                     isFav ? Icons.favorite : Icons.favorite_border,
@@ -229,7 +232,6 @@ class PetCard extends StatelessWidget {
                 ),
               ],
             ),
-            // TODO: Использовать Image.network(petModel.imageUrls.first)
             const Spacer(),
             Row(
               children: [

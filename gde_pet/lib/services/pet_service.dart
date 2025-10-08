@@ -2,20 +2,17 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:geoflutterfire_plus/geoflutterfire_plus.dart';
-import '../models/pet_model.dart'; // Предполагается, что вы уже создали этот файл
-import '../models/user_model.dart'; // Добавьте этот импорт, если PetModel зависит от него
+import '../models/pet_model.dart';
+import '../models/user_model.dart';
 
 class PetService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
-
-  // Создать объявление
   Future<String> createPet(PetModel pet) async {
     try {
       final docRef = await _firestore.collection('pets').add(pet.toJson());
       return docRef.id;
     } catch (e) {
-      // Логируем ошибку и пробрасываем сообщение дальше
       print('PetService (createPet) error: $e');
       throw 'Ошибка создания объявления: $e';
     }

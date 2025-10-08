@@ -172,9 +172,9 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
     if (mounted) {
       if (success) {
-        // Добавление: Обновляем список объявлений после создания
-        await petProvider.loadUserPets(authProvider.user!.uid); 
-        await petProvider.loadPetsByStatus(_selectedStatus); 
+        // Перезагружаем данные
+        await petProvider.loadUserPets(authProvider.user!.uid);
+        await petProvider.loadPets();
         
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -183,10 +183,8 @@ class _AddPetScreenState extends State<AddPetScreen> {
           ),
         );
         
-        // CRITICAL FIX: Возвращаемся к первой доступной навигации
-        // Это предотвратит черный экран, который может возникать при
-        // попытке закрыть модальный маршрут, который был заменен.
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // ИСПРАВЛЕНИЕ: Просто закрываем экран и возвращаемся назад
+        Navigator.of(context).pop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -229,7 +227,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Статус
               const Text(
                 'Статус',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -257,7 +254,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
               const SizedBox(height: 24),
 
-              // Тип животного
               const Text(
                 'Тип животного',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -286,7 +282,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
               const SizedBox(height: 24),
 
-              // Фотографии
               const Text(
                 'Фотографии',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -349,7 +344,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
               const SizedBox(height: 24),
 
-              // Кличка питомца
               const Text(
                 'Кличка питомца',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -368,7 +362,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
               const SizedBox(height: 24),
 
-              // Описание
               const Text(
                 'Особые приметы',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -379,7 +372,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 maxLines: 4,
                 maxLength: 500,
                 decoration: const InputDecoration(
-                  hintText: 'Коричневого цвета, белые пятна на лапках, голубые глаза',
+                  hintText: 'Коричневого цвета, белые пятна на лапках',
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -391,7 +384,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
               const SizedBox(height: 24),
 
-              // Место
               const Text(
                 'Место',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -459,7 +451,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 TextFormField(
                   controller: _addressController,
                   decoration: const InputDecoration(
-                    hintText: 'Астана, район Есиль, улица Кабанбай батыра',
+                    hintText: 'Астана, район Есиль',
                   ),
                 ),
               ],
@@ -498,7 +490,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
               const SizedBox(height: 24),
 
-              // Контакты
               const Text(
                 'Контактная информация',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -525,7 +516,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
               const SizedBox(height: 32),
 
-              // Кнопка создания
               SizedBox(
                 width: double.infinity,
                 height: 56,

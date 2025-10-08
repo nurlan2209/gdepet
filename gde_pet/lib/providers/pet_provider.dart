@@ -96,6 +96,7 @@ class PetProvider extends ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
+      print('PetProvider (createPet) error: $e');
       _error = e.toString();
       _setLoading(false);
       return false;
@@ -108,10 +109,13 @@ class PetProvider extends ChangeNotifier {
       _setLoading(true);
       _error = null;
 
+      print('PetProvider: Loading all pets...');
       _pets = await _petService.getAllActivePets();
+      print('PetProvider: Loaded ${_pets.length} pets');
 
       _setLoading(false);
     } catch (e) {
+      print('PetProvider (loadPets) error: $e');
       _error = e.toString();
       _setLoading(false);
     }
@@ -123,10 +127,13 @@ class PetProvider extends ChangeNotifier {
       _setLoading(true);
       _error = null;
 
+      print('PetProvider: Loading pets by status: $status');
       _pets = await _petService.getPetsByStatus(status);
+      print('PetProvider: Loaded ${_pets.length} pets with status $status');
 
       _setLoading(false);
     } catch (e) {
+      print('PetProvider (loadPetsByStatus) error: $e');
       _error = e.toString();
       _setLoading(false);
     }
@@ -138,10 +145,13 @@ class PetProvider extends ChangeNotifier {
       _setLoading(true);
       _error = null;
 
+      print('PetProvider: Loading user pets for $userId');
       _userPets = await _petService.getUserPets(userId);
+      print('PetProvider: Loaded ${_userPets.length} user pets');
 
       _setLoading(false);
     } catch (e) {
+      print('PetProvider (loadUserPets) error: $e');
       _error = e.toString();
       _setLoading(false);
     }
@@ -158,6 +168,7 @@ class PetProvider extends ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
+      print('PetProvider (deactivatePet) error: $e');
       _error = e.toString();
       _setLoading(false);
       return false;
@@ -182,6 +193,7 @@ class PetProvider extends ChangeNotifier {
 
       _setLoading(false);
     } catch (e) {
+      print('PetProvider (searchNearbyPets) error: $e');
       _error = e.toString();
       _setLoading(false);
     }

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
+import '../../providers/pet_provider.dart';
 import 'analytics_screen.dart';
 import 'edit_profile_screen.dart';
-import 'user_pets_screen.dart'; // <--- НОВЫЙ ИМПОРТ
+import 'user_pets_screen.dart';
+import 'favorites_screen.dart';
 import '../auth/welcome_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -15,6 +17,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  int _postsCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -24,9 +28,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfile() async {
     final authProvider = context.read<AuthProvider>();
     final profileProvider = context.read<ProfileProvider>();
+    final petProvider = context.read<PetProvider>();
     
     if (authProvider.user != null) {
       await profileProvider.loadProfile(authProvider.user!.uid);
+      await petProvider.loadUserPets(authProvider.user!.uid);
+      
+      setState(() {
+        _postsCount = petProvider.userPets.length;
+      });
     }
   }
 
@@ -77,12 +87,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final authProvider = context.watch<AuthProvider>();
     final profileProvider = context.watch<ProfileProvider>();
 
-    // Показываем сообщение для гостей
     if (authProvider.isGuest) {
       return _buildGuestView();
     }
 
-    // Загрузка профиля
     if (profileProvider.isLoading && profileProvider.profile == null) {
       return const Scaffold(
         body: Center(
@@ -132,7 +140,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               const SizedBox(height: 24),
               
-              // Аватар
               Stack(
                 children: [
                   CircleAvatar(
@@ -162,7 +169,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           MaterialPageRoute(
                             builder: (context) => const EditProfileScreen(),
                           ),
-                        );
+                        ).then((_) => _loadProfile());
                       },
                       child: Container(
                         padding: const EdgeInsets.all(8),
@@ -183,7 +190,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               
               const SizedBox(height: 16),
               
-              // Имя
               Text(
                 displayName,
                 style: const TextStyle(
@@ -194,7 +200,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               
               const SizedBox(height: 8),
               
-              // Email
               if (authProvider.user?.email != null)
                 Text(
                   authProvider.user!.email!,
@@ -204,7 +209,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               
-              // Верификация email
               if (authProvider.user?.emailVerified == false)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -240,12 +244,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               
               const SizedBox(height: 24),
               
-              // Статистика
-              _buildStatsCard(profile),
+              _buildStatsCard(),
               
               const SizedBox(height: 24),
               
-              // Меню
               _buildProfileMenuItem(
                 icon: Icons.edit_outlined,
                 text: 'Изменить профиль',
@@ -255,7 +257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     MaterialPageRoute(
                       builder: (context) => const EditProfileScreen(),
                     ),
-                  );
+                  ).then((_) => _loadProfile());
                 },
               ),
               
@@ -272,17 +274,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
               
-              // ИСПРАВЛЕНО: Теперь ведет на экран со списком объявлений пользователя
               _buildProfileMenuItem(
                 icon: Icons.pets_outlined,
                 text: 'Мои объявления',
+                badge: _postsCount > 0 ? _postsCount.toString() : null,
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const UserPetsScreen(), // <--- ВЫЗЫВАЕМ НОВЫЙ ЭКРАН
+                      builder: (context) => const UserPetsScreen(),
                     ),
-                  );
+                  ).then((_) => _loadProfile());
                 },
               ),
               
@@ -290,21 +292,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.favorite_outline,
                 text: 'Избранное',
                 onTap: () {
-                  // TODO: Реализовать позже
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FavoritesScreen(),
+                    ),
+                  );
                 },
               ),
               
               _buildProfileMenuItem(
                 icon: Icons.settings_outlined,
                 text: 'Настройки',
-                onTap: () {
-                  // TODO: Реализовать позже
-                },
+                onTap: () {},
               ),
               
               const SizedBox(height: 24),
               
-              // Кнопка выхода
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -332,9 +336,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
- 
 
-  Widget _buildStatsCard(profile) {
+  Widget _buildStatsCard() {
+    final profile = context.watch<ProfileProvider>().profile;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -346,7 +351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _buildStatItem(
             'Объявлений',
-            profile?.postsCount?.toString() ?? '0',
+            _postsCount.toString(),
             Icons.pets,
           ),
           Container(
@@ -390,6 +395,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileMenuItem({
     required IconData icon,
     required String text,
+    String? badge,
     required VoidCallback onTap,
   }) {
     return Container(
@@ -400,12 +406,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: ListTile(
         leading: Icon(icon, color: Colors.black),
-        title: Text(
-          text,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 16,
-          ),
+        title: Row(
+          children: [
+            Text(
+              text,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 16,
+              ),
+            ),
+            if (badge != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEE8A9A),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  badge,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         trailing: const Icon(
           Icons.arrow_forward_ios,
