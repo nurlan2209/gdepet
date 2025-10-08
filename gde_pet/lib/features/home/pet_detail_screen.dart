@@ -22,13 +22,185 @@ class PetDetailScreen extends StatefulWidget {
 
 class _PetDetailScreenState extends State<PetDetailScreen> {
 
+  // Улучшенная функция "Поделиться" с выбором куда отправить
   void _sharePet() {
     final pet = widget.pet;
-    final text = 'Помогите найти! Пропал(а) ${pet.type.displayName.toLowerCase()} '
-                 'по кличке "${pet.petName}".\n\n'
-                 'Приметы: ${pet.description}\n\n'
-                 'Смотрите подробности в приложении GdePet!';
-    Share.share(text);
+    
+    // Формируем текст для отправки
+    final statusEmoji = pet.status == PetStatus.lost ? '🆘' : '✅';
+    final statusText = pet.status == PetStatus.lost ? 'Пропал(а)' : 'Найден(а)';
+    
+    String locationInfo = '';
+    if (pet.address != null && pet.address!.isNotEmpty) {
+      locationInfo = '\n📍 Местоположение: ${pet.address}';
+    } else if (pet.latitude != null && pet.longitude != null) {
+      locationInfo = '\n📍 Координаты: ${pet.latitude}, ${pet.longitude}\n'
+                     '🗺️ Карта: https://maps.google.com/?q=${pet.latitude},${pet.longitude}';
+    }
+    
+    String contactInfo = '';
+    if (pet.contactPhone != null && pet.contactPhone!.isNotEmpty) {
+      contactInfo += '\n📞 Телефон: ${pet.contactPhone}';
+    }
+    if (pet.contactTelegram != null && pet.contactTelegram!.isNotEmpty) {
+      contactInfo += '\n✈️ Telegram: ${pet.contactTelegram}';
+    }
+    
+    final text = '$statusEmoji Внимание! $statusText ${pet.type.displayName.toLowerCase()}!\n\n'
+                 '🐾 Кличка: ${pet.petName}\n'
+                 '📋 Приметы: ${pet.description}$locationInfo'
+                 '$contactInfo\n\n'
+                 '👤 Владелец: ${pet.ownerName}\n\n'
+                 '📱 Приложение: GdePet\n'
+                 'Помогите найти или вернуть питомца!';
+
+    // Share.share открывает системное меню "Поделиться" где можно выбрать приложение
+    Share.share(
+      text,
+      subject: '$statusText ${pet.type.displayName} "${pet.petName}"',
+    );
+  }
+
+  // Улучшенная функция "Помощь" с выбором способа связи
+  Future<void> _callForHelp() async {
+    final pet = widget.pet;
+    
+    // Показываем диалог с выбором способа связи
+    final method = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🆘 Позвать на помощь'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Выберите способ связи с волонтерами:',
+              style: TextStyle(fontSize: 14),
+            ),
+            SizedBox(height: 16),
+            Text(
+              '• WhatsApp - быстрое сообщение\n'
+              '• Позвонить - прямой звонок\n'
+              '• SMS - текстовое сообщение',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'sms'),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.message, size: 18),
+                SizedBox(width: 4),
+                Text('SMS'),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'call'),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.phone, size: 18),
+                SizedBox(width: 4),
+                Text('Позвонить'),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, 'whatsapp'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF25D366), // WhatsApp color
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.chat, size: 18),
+                SizedBox(width: 4),
+                Text('WhatsApp'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (method == null) return;
+
+    const String phone = '77771959900';
+    
+    // Формируем информацию о местоположении
+    String locationInfo;
+    if (pet.address != null && pet.address!.isNotEmpty) {
+      locationInfo = pet.address!;
+    } else if (pet.latitude != null && pet.longitude != null) {
+      locationInfo = 'Координаты: ${pet.latitude}, ${pet.longitude}\n'
+                     'Карта: https://maps.google.com/?q=${pet.latitude},${pet.longitude}';
+    } else {
+      locationInfo = 'Местоположение не указано';
+    }
+    
+    // Формируем сообщение
+    final message = '🆘 Требуется помощь!\n\n'
+                    '🐾 Животное: ${pet.petName}\n'
+                    '📋 Тип: ${pet.type.displayName}\n'
+                    '📝 Приметы: ${pet.description}\n\n'
+                    '📍 Местоположение:\n$locationInfo\n\n'
+                    '👤 Владелец: ${pet.ownerName}\n'
+                    '📱 Приложение: GdePet';
+
+    try {
+      Uri uri;
+      
+      switch (method) {
+        case 'whatsapp':
+          uri = Uri.parse("https://wa.me/$phone?text=${Uri.encodeComponent(message)}");
+          break;
+        case 'call':
+          uri = Uri.parse('tel:+$phone');
+          break;
+        case 'sms':
+          uri = Uri.parse('sms:+$phone?body=${Uri.encodeComponent(message)}');
+          break;
+        default:
+          return;
+      }
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Не удалось открыть ${method == 'whatsapp' ? 'WhatsApp' : method == 'call' ? 'приложение для звонков' : 'приложение для SMS'}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _handleSeenSighting() async {
@@ -70,7 +242,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
-            child: const Text('Подтвердить'),
+            child: const Text('Подтвердить', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -80,6 +252,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
 
     if (!mounted) return;
     
+    // Показываем индикатор загрузки
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Row(
@@ -101,6 +274,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     );
 
     try {
+      // Проверяем, включена ли геолокация
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
@@ -122,6 +296,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
         return;
       }
 
+      // Проверяем разрешения
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -169,7 +344,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                  child: const Text('Настройки'),
+                  child: const Text('Настройки', style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
@@ -178,6 +353,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
         return;
       }
 
+      // Получаем местоположение
       Position? position;
       try {
         position = await Geolocator.getCurrentPosition(
@@ -188,10 +364,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
             throw TimeoutException('Превышено время ожидания');
           },
         );
-        
-        print('Got position: ${position.latitude}, ${position.longitude}');
       } catch (e) {
-        print('Error getting position: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -204,6 +377,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
         return;
       }
 
+      // Отправляем отметку
       final petProvider = context.read<PetProvider>();
       bool success = false;
       
@@ -214,10 +388,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
           longitude: position.longitude,
           userId: authProvider.user!.uid,
         );
-        
-        print('Sighting added: $success');
       } catch (e) {
-        print('Error adding sighting: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -265,98 +436,8 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
         }
       }
     } catch (e) {
-      print('Unexpected error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _callForHelp() async {
-    final pet = widget.pet;
-    const String phone = '77771959900';
-    
-    String locationInfo;
-    if (pet.address != null && pet.address!.isNotEmpty) {
-      locationInfo = pet.address!;
-    } else if (pet.latitude != null && pet.longitude != null) {
-      locationInfo = 'Координаты: ${pet.latitude}, ${pet.longitude}\n'
-                     'Карта: https://maps.google.com/?q=${pet.latitude},${pet.longitude}';
-    } else {
-      locationInfo = 'Местоположение не указано';
-    }
-    
-    final message = '🆘 Требуется помощь!\n\n'
-                    '🐾 Животное: ${pet.petName}\n'
-                    '📋 Тип: ${pet.type.displayName}\n'
-                    '📝 Приметы: ${pet.description}\n\n'
-                    '📍 Местоположение:\n$locationInfo\n\n'
-                    'Приложение: GdePet';
-
-    final whatsappUrl = Uri.parse(
-      "https://wa.me/$phone?text=${Uri.encodeComponent(message)}"
-    );
-    
-    try {
-      final canLaunch = await canLaunchUrl(whatsappUrl);
-      
-      if (canLaunch) {
-        final launched = await launchUrl(
-          whatsappUrl,
-          mode: LaunchMode.externalApplication,
-        );
-        
-        if (!launched && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Не удалось открыть WhatsApp'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('WhatsApp не найден'),
-              content: const Text(
-                'WhatsApp не установлен на вашем устройстве.\n\n'
-                'Вы можете:\n'
-                '• Установить WhatsApp из магазина приложений\n'
-                '• Позвонить по номеру +7 777 195 99 00',
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Закрыть'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final telUrl = Uri.parse('tel:+77771959900');
-                    if (await canLaunchUrl(telUrl)) {
-                      await launchUrl(telUrl);
-                    }
-                    if (context.mounted) Navigator.pop(context);
-                  },
-                  child: const Text('Позвонить'),
-                ),
-              ],
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Ошибка: $e'),
