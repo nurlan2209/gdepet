@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
+import 'dart:async';
 import 'package:gde_pet/features/messenger/chat_detail_screen.dart';
 import 'package:gde_pet/services/chat_service.dart';
 import 'package:geolocator/geolocator.dart';
@@ -33,92 +33,337 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
 
   Future<void> _handleSeenSighting() async {
     final authProvider = context.read<AuthProvider>();
+    
     if (authProvider.user == null) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Для этого действия нужно войти в аккаунт')),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Для этого действия нужно войти в аккаунт'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
 
-    bool serviceEnabled;
-    LocationPermission permission;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('👀 Видели питомца?'),
+        content: const Text(
+          'Эта функция поможет владельцу найти питомца!\n\n'
+          'Ваше текущее местоположение будет отправлено владельцу как место, '
+          'где питомца видели в последний раз.\n\n'
+          'Нужно разрешить доступ к геолокации.',
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: const Text('Подтвердить'),
+          ),
+        ],
+      ),
+    );
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Включите геолокацию')));
-      return;
-    }
+    if (confirmed != true) return;
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Нет доступа к геолокации')));
-        return;
-      }
-    }
+    if (!mounted) return;
     
-    if (permission == LocationPermission.deniedForever) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Нет доступа к геолокации')));
-      return;
-    } 
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            SizedBox(width: 16),
+            Text('Определение местоположения...'),
+          ],
+        ),
+        duration: Duration(seconds: 10),
+      ),
+    );
 
     try {
-      final position = await Geolocator.getCurrentPosition();
-      final petProvider = context.read<PetProvider>();
-      final success = await petProvider.addSighting(
-        petId: widget.pet.id,
-        latitude: position.latitude,
-        longitude: position.longitude,
-        userId: authProvider.user!.uid,
-      );
-      if (mounted && success) {
-         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Ваша отметка отправлена хозяину! Спасибо!'),
-            backgroundColor: Colors.green,
-          ),
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Включите геолокацию в настройках устройства'),
+              backgroundColor: Colors.orange,
+              action: SnackBarAction(
+                label: 'Настройки',
+                textColor: Colors.white,
+                onPressed: () async {
+                  await Geolocator.openLocationSettings();
+                },
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Доступ к геолокации запрещен'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Нет доступа к геолокации'),
+              content: const Text(
+                'Доступ к геолокации запрещен навсегда.\n\n'
+                'Пожалуйста, разрешите доступ в настройках приложения.',
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Отмена'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await Geolocator.openAppSettings();
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEE8A9A),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  child: const Text('Настройки'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw TimeoutException('Превышено время ожидания');
+          },
         );
-      } else if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
+        
+        print('Got position: ${position.latitude}, ${position.longitude}');
+      } catch (e) {
+        print('Error getting position: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Не удалось определить местоположение. Попробуйте еще раз'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      final petProvider = context.read<PetProvider>();
+      bool success = false;
+      
+      try {
+        success = await petProvider.addSighting(
+          petId: widget.pet.id,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          userId: authProvider.user!.uid,
+        );
+        
+        print('Sighting added: $success');
+      } catch (e) {
+        print('Error adding sighting: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ошибка отправки: ${e.toString()}'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Спасибо! Ваша отметка отправлена владельцу',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                petProvider.error ?? 'Не удалось добавить отметку',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Unexpected error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(petProvider.error ?? 'Не удалось добавить отметку'),
+            content: Text('Ошибка: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка получения локации: $e')));
     }
   }
 
   Future<void> _callForHelp() async {
     final pet = widget.pet;
-    const String phone = '+77771959900';
-    final String lastLocation = pet.address ?? (pet.latitude != null ? 'https://maps.google.com/?q=${pet.latitude},${pet.longitude}' : 'Не указано');
+    const String phone = '77771959900';
     
-    final message = 'Требуется помощь. Пропало животное: ${pet.petName}.\n'
-                    'Приметы: ${pet.description}.\n'
-                    'Последнее известное местоположение: $lastLocation';
+    String locationInfo;
+    if (pet.address != null && pet.address!.isNotEmpty) {
+      locationInfo = pet.address!;
+    } else if (pet.latitude != null && pet.longitude != null) {
+      locationInfo = 'Координаты: ${pet.latitude}, ${pet.longitude}\n'
+                     'Карта: https://maps.google.com/?q=${pet.latitude},${pet.longitude}';
+    } else {
+      locationInfo = 'Местоположение не указано';
+    }
+    
+    final message = '🆘 Требуется помощь!\n\n'
+                    '🐾 Животное: ${pet.petName}\n'
+                    '📋 Тип: ${pet.type.displayName}\n'
+                    '📝 Приметы: ${pet.description}\n\n'
+                    '📍 Местоположение:\n$locationInfo\n\n'
+                    'Приложение: GdePet';
 
-    final whatsappUrl = Uri.parse("whatsapp://send?phone=$phone&text=${Uri.encodeComponent(message)}");
+    final whatsappUrl = Uri.parse(
+      "https://wa.me/$phone?text=${Uri.encodeComponent(message)}"
+    );
     
     try {
-      if (await canLaunchUrl(whatsappUrl)) {
-        await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+      final canLaunch = await canLaunchUrl(whatsappUrl);
+      
+      if (canLaunch) {
+        final launched = await launchUrl(
+          whatsappUrl,
+          mode: LaunchMode.externalApplication,
+        );
+        
+        if (!launched && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Не удалось открыть WhatsApp'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Не удалось открыть WhatsApp')),
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('WhatsApp не найден'),
+              content: const Text(
+                'WhatsApp не установлен на вашем устройстве.\n\n'
+                'Вы можете:\n'
+                '• Установить WhatsApp из магазина приложений\n'
+                '• Позвонить по номеру +7 777 195 99 00',
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Закрыть'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final telUrl = Uri.parse('tel:+77771959900');
+                    if (await canLaunchUrl(telUrl)) {
+                      await launchUrl(telUrl);
+                    }
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text('Позвонить'),
+                ),
+              ],
+            ),
           );
         }
       }
     } catch (e) {
-       if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка: $e')),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -170,7 +415,6 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Pet Image
           SizedBox(
             height: MediaQuery.of(context).size.height * 0.65,
             width: double.infinity,
@@ -191,7 +435,6 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
                   ),
           ),
           
-          // Back Button
           Positioned(
             top: 50,
             left: 16,
@@ -204,7 +447,6 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
             ),
           ),
           
-          // Status
           Positioned(
             top: 50,
             right: 16,
@@ -225,7 +467,6 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
             ),
           ),
           
-          // Info Panel
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(

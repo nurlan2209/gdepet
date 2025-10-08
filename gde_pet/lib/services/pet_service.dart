@@ -8,21 +8,51 @@ class PetService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
+  // Замените метод addSighting в pet_service.dart на этот:
+
   Future<void> addSighting(String petId, GeoPoint location, String userId) async {
-    try {
-      final sightingData = {
-        'location': location,
-        'userId': userId,
-        'timestamp': FieldValue.serverTimestamp(),
-      };
-      
-      await _firestore.collection('pets').doc(petId).update({
-        'sightings': FieldValue.arrayUnion([sightingData]),
-      });
-    } catch (e) {
-      print('PetService (addSighting) error: $e');
-      throw 'Ошибка добавления отметки: $e';
+  try {
+    print('PetService: Adding sighting for pet $petId');
+    print('Location: ${location.latitude}, ${location.longitude}');
+    print('User ID: $userId');
+    
+    // Создаем данные для отметки
+    final sightingData = {
+      'latitude': location.latitude,
+      'longitude': location.longitude,
+      'userId': userId,
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+    
+    print('Sighting data: $sightingData');
+    
+    // Получаем текущий документ
+    final petDoc = await _firestore.collection('pets').doc(petId).get();
+    
+    if (!petDoc.exists) {
+      throw 'Объявление не найдено';
     }
+    
+    // Получаем текущий массив отметок
+    final currentData = petDoc.data();
+    List<dynamic> currentSightings = currentData?['sightings'] ?? [];
+    
+    print('Current sightings count: ${currentSightings.length}');
+    
+    // Добавляем новую отметку
+    currentSightings.add(sightingData);
+    
+    // Обновляем документ
+    await _firestore.collection('pets').doc(petId).update({
+      'sightings': currentSightings,
+    });
+    
+    print('PetService: Sighting added successfully');
+  } catch (e) {
+    print('PetService (addSighting) error: $e');
+    print('Error type: ${e.runtimeType}');
+    throw 'Ошибка добавления отметки: $e';
+  }
   }
 
   Future<String> createPet(PetModel pet) async {

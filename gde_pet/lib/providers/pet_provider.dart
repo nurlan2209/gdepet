@@ -18,6 +18,8 @@ class PetProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  // Замените метод addSighting в pet_provider.dart на этот:
+
   Future<bool> addSighting({
     required String petId,
     required double latitude,
@@ -25,17 +27,32 @@ class PetProvider extends ChangeNotifier {
     required String userId,
   }) async {
     try {
+      print('PetProvider: Starting addSighting');
+      print('PetId: $petId');
+      print('Location: $latitude, $longitude');
+      print('UserId: $userId');
+      
+      _error = null;
+      
       final location = GeoPoint(latitude, longitude);
+      
       await _petService.addSighting(petId, location, userId);
+      
+      print('PetProvider: Sighting added successfully');
+      
+      // Обновляем список питомцев
+      await loadPets();
+      
       notifyListeners();
       return true;
     } catch (e) {
+      print('PetProvider (addSighting) error: $e');
+      print('Error stack trace: ${StackTrace.current}');
       _error = e.toString();
       notifyListeners();
       return false;
     }
   }
-
   // Создать объявление
   Future<bool> createPet({
     required String userId,
