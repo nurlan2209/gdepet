@@ -8,53 +8,153 @@ class PetService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // Замените метод addSighting в pet_service.dart на этот:
-
   Future<void> addSighting(String petId, GeoPoint location, String userId) async {
-  try {
-    print('PetService: Adding sighting for pet $petId');
-    print('Location: ${location.latitude}, ${location.longitude}');
-    print('User ID: $userId');
-    
-    // Создаем данные для отметки
-    final sightingData = {
-      'latitude': location.latitude,
-      'longitude': location.longitude,
-      'userId': userId,
-      'timestamp': FieldValue.serverTimestamp(),
-    };
-    
-    print('Sighting data: $sightingData');
-    
-    // Получаем текущий документ
-    final petDoc = await _firestore.collection('pets').doc(petId).get();
-    
-    if (!petDoc.exists) {
-      throw 'Объявление не найдено';
+    try {
+      print('PetService: Adding sighting for pet $petId');
+      print('Location: ${location.latitude}, ${location.longitude}');
+      print('User ID: $userId');
+      
+      // Создаем данные для отметки с реальным timestamp
+      final now = DateTime.now();
+      final sightingData = {
+        'latitude': location.latitude,
+        'longitude': location.longitude,
+        'userId': userId,
+        'timestamp': now.toIso8601String(), // Используем ISO строку вместо FieldValue
+        'googleMapsUrl': 'https://maps.google.com/?q=${location.latitude},${location.longitude}',
+      };
+      
+      print('Sighting data: $sightingData');
+      
+      // Получаем текущий документ
+      final petDoc = await _firestore.collection('pets').doc(petId).get();
+      
+      if (!petDoc.exists) {
+        throw 'Объявление не найдено';
+      }
+      
+      // Получаем текущий массив отметок
+      final currentData = petDoc.data();
+      List<dynamic> currentSightings = List.from(currentData?['sightings'] ?? []);
+      
+      print('Current sightings count: ${currentSightings.length}');
+      
+      // Добавляем новую отметку
+      currentSightings.add(sightingData);
+      
+      // Обновляем документ
+      await _firestore.collection('pets').doc(petId).update({
+        'sightings': currentSightings,
+        'updatedAt': now.toIso8601String(),
+      });
+      
+      print('PetService: Sighting added successfully');
+      
+      // Отправляем уведомление владельцу через создание чата
+      await _sendSightingNotification(petId, userId, location, currentData);
+      
+    } catch (e) {
+      print('PetService (addSighting) error: $e');
+      print('Error type: ${e.runtimeType}');
+      throw 'Ошибка добавления отметки: $e';
     }
-    
-    // Получаем текущий массив отметок
-    final currentData = petDoc.data();
-    List<dynamic> currentSightings = currentData?['sightings'] ?? [];
-    
-    print('Current sightings count: ${currentSightings.length}');
-    
-    // Добавляем новую отметку
-    currentSightings.add(sightingData);
-    
-    // Обновляем документ
-    await _firestore.collection('pets').doc(petId).update({
-      'sightings': currentSightings,
-    });
-    
-    print('PetService: Sighting added successfully');
-  } catch (e) {
-    print('PetService (addSighting) error: $e');
-    print('Error type: ${e.runtimeType}');
-    throw 'Ошибка добавления отметки: $e';
   }
+  
+  Future<void> _sendSightingNotification(
+    String petId, 
+    String sighterId, 
+    GeoPoint location,
+    Map<String, dynamic>? petData,
+  ) async {
+    try {
+      if (petData == null) return;
+      
+      final ownerId = petData['userId'] as String?;
+      final petName = petData['petName'] as String? ?? 'питомца';
+      
+      if (ownerId == null || ownerId == sighterId) return;
+      
+      // Получаем данные пользователя, который видел питомца
+      final sighterDoc = await _firestore.collection('users').doc(sighterId).get();
+      final sighterData = sighterDoc.data();
+      final sighterName = sighterData?['firstName'] ?? 'Пользователь';
+      
+      // Создаем ID чата
+      List<String> ids = [ownerId, sighterId];
+      ids.sort();
+      final chatId = ids.join('_');
+      
+      // Проверяем существование чата
+      final chatDoc = await _firestore.collection('chats').doc(chatId).get();
+      
+      if (!chatDoc.exists) {
+        // Получаем данные владельца для создания чата
+        final ownerDoc = await _firestore.collection('users').doc(ownerId).get();
+        final ownerData = ownerDoc.data();
+        
+        if (ownerData != null) {
+          await _firestore.collection('chats').doc(chatId).set({
+            'users': [ownerId, sighterId],
+            'lastMessage': '',
+            'lastMessageTimestamp': Timestamp.now(),
+            'userNames': {
+              ownerId: ownerData['firstName'] ?? 'Владелец',
+              sighterId: sighterName,
+            },
+            'userPhotos': {
+              ownerId: ownerData['photoURL'],
+              sighterId: sighterData?['photoURL'],
+            },
+          });
+        }
+      }
+      
+      // Формируем сообщение
+      final googleMapsUrl = 'https://maps.google.com/?q=${location.latitude},${location.longitude}';
+      final message = '👀 Я видел(а) вашего питомца "$petName"!\n\n'
+          '📍 Местоположение:\n'
+          'Широта: ${location.latitude.toStringAsFixed(6)}\n'
+          'Долгота: ${location.longitude.toStringAsFixed(6)}\n\n'
+          '🗺️ Открыть на карте: $googleMapsUrl\n\n'
+          '⏰ ${_formatDateTime(DateTime.now())}';
+      
+      // Отправляем сообщение
+      await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .add({
+        'senderId': sighterId,
+        'receiverId': ownerId,
+        'text': message,
+        'timestamp': Timestamp.now(),
+        'sightingLocation': {
+          'latitude': location.latitude,
+          'longitude': location.longitude,
+        }
+      });
+      
+      // Обновляем последнее сообщение в чате
+      await _firestore.collection('chats').doc(chatId).update({
+        'lastMessage': '👀 Видели вашего питомца!',
+        'lastMessageTimestamp': Timestamp.now(),
+      });
+      
+      print('PetService: Notification sent successfully');
+    } catch (e) {
+      print('PetService (_sendSightingNotification) error: $e');
+      // Не прерываем выполнение, если не удалось отправить уведомление
+    }
   }
 
+  String _formatDateTime(DateTime dateTime) {
+    final months = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+    ];
+    
+    return '${dateTime.day} ${months[dateTime.month - 1]} ${dateTime.year} в ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
   Future<String> createPet(PetModel pet) async {
     try {
       final docRef = await _firestore.collection('pets').add(pet.toJson());
