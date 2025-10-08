@@ -1,13 +1,30 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:geoflutterfire_plus/geoflutterfire_plus.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/pet_model.dart';
-import '../models/user_model.dart';
 
 class PetService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  Future<void> addSighting(String petId, GeoPoint location, String userId) async {
+    try {
+      final sightingData = {
+        'location': location,
+        'userId': userId,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+      
+      await _firestore.collection('pets').doc(petId).update({
+        'sightings': FieldValue.arrayUnion([sightingData]),
+      });
+    } catch (e) {
+      print('PetService (addSighting) error: $e');
+      throw 'Ошибка добавления отметки: $e';
+    }
+  }
+
   Future<String> createPet(PetModel pet) async {
     try {
       final docRef = await _firestore.collection('pets').add(pet.toJson());
@@ -19,19 +36,17 @@ class PetService {
   }
 
   // Загрузить фотографии питомца
-  Future<List<String>> uploadPetPhotos(String petId, List<File> images) async {
+  Future<List<String>> uploadPetPhotos(String petId, List<XFile> images) async {
     try {
       List<String> urls = [];
       
       for (int i = 0; i < images.length; i++) {
-        // Убедимся, что файл существует
-        if (!await images[i].exists()) {
-          continue; 
-        }
-        
         final ref = _storage.ref().child('pets/$petId/photo_$i.jpg');
-        // Используем PutFile, чтобы избежать ошибок с передачей
-        final uploadTask = await ref.putFile(images[i]); 
+        
+        // Используем readAsBytes() и putData() для кроссплатформенной загрузки
+        final bytes = await images[i].readAsBytes();
+        final uploadTask = await ref.putData(bytes);
+        
         final url = await uploadTask.ref.getDownloadURL();
         urls.add(url);
       }
@@ -61,11 +76,9 @@ Future<void> deletePet(String id) async {
   try {
     print('PetService: Deleting pet with ID: $id');
     
-    // Сначала получаем объявление чтобы удалить фотографии
     final pet = await getPetById(id);
     
     if (pet != null && pet.imageUrls.isNotEmpty) {
-      // Удаляем все фотографии из Storage
       for (String imageUrl in pet.imageUrls) {
         try {
           final ref = _storage.refFromURL(imageUrl);
@@ -73,12 +86,10 @@ Future<void> deletePet(String id) async {
           print('PetService: Deleted image: $imageUrl');
         } catch (e) {
           print('PetService: Failed to delete image $imageUrl: $e');
-          // Продолжаем даже если не удалось удалить фото
         }
       }
     }
     
-    // Удаляем документ из Firestore
     await _firestore.collection('pets').doc(id).delete();
     print('PetService: Pet deleted successfully');
   } catch (e) {
@@ -149,12 +160,10 @@ Future<void> deletePet(String id) async {
     try {
       final doc = await _firestore.collection('pets').doc(id).get();
       
-      // Явно проверяем существование и возвращаем null, если нет.
       if (!doc.exists || doc.data() == null) {
         return null;
       }
       
-      // Если существует, возвращаем модель
       return PetModel.fromJson({...doc.data()!, 'id': doc.id});
       
     } catch (e) {
@@ -208,9 +217,6 @@ Future<void> deletePet(String id) async {
               if (lat != null && lon != null) {
                 return GeoPoint(lat, lon);
               }
-              // CRITICAL FIX: Если компилятор строго требует GeoPoint (не GeoPoint?), 
-              // мы не можем вернуть null. Генерируем исключение, чтобы удовлетворить 
-              // требование non-nullable возврата.
               throw Exception('Invalid GeoPoint data in document. Document will be skipped.');
             },
             strictMode: true,
@@ -258,9 +264,6 @@ Future<void> deletePet(String id) async {
               if (lat != null && lon != null) {
                 return GeoPoint(lat, lon);
               }
-              // CRITICAL FIX: Если компилятор строго требует GeoPoint (не GeoPoint?), 
-              // мы не можем вернуть null. Генерируем исключение, чтобы удовлетворить 
-              // требование non-nullable возврата.
               throw Exception('Invalid GeoPoint data in document. Document will be skipped.');
             },
             strictMode: true,
@@ -279,8 +282,8 @@ Future<void> deletePet(String id) async {
           });
     } catch (e) {
       print('PetService (streamNearbyPets) error: $e');
-      // В стриме лучше не пробрасывать throw, а возвращать пустой стрим или onError
       rethrow; 
     }
   }
 }
+

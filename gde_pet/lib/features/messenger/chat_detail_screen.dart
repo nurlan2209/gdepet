@@ -1,10 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/chat_service.dart';
+import '../../models/message_model.dart';
 
-class ChatDetailScreen extends StatelessWidget {
-  const ChatDetailScreen({super.key});
+class ChatDetailScreen extends StatefulWidget {
+  final String chatId;
+  final String receiverId;
+  final String receiverName;
+
+  const ChatDetailScreen({
+    super.key,
+    required this.chatId,
+    required this.receiverId,
+    required this.receiverName,
+  });
+
+  @override
+  State<ChatDetailScreen> createState() => _ChatDetailScreenState();
+}
+
+class _ChatDetailScreenState extends State<ChatDetailScreen> {
+  final TextEditingController _messageController = TextEditingController();
+  final ChatService _chatService = ChatService();
+
+  void _sendMessage() {
+    if (_messageController.text.trim().isEmpty) return;
+    
+    final senderId = context.read<AuthProvider>().user!.uid;
+
+    final message = MessageModel(
+      senderId: senderId,
+      receiverId: widget.receiverId,
+      text: _messageController.text.trim(),
+      timestamp: Timestamp.now(),
+    );
+
+    _chatService.sendMessage(widget.chatId, message);
+    _messageController.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final senderId = context.watch<AuthProvider>().user!.uid;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -13,9 +53,9 @@ class ChatDetailScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Название чата',
-          style: TextStyle(
+        title: Text(
+          widget.receiverName,
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
             fontSize: 22,
@@ -26,26 +66,29 @@ class ChatDetailScreen extends StatelessWidget {
       body: Column(
         children: [
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: const [
-                Align(
-                  alignment: Alignment.center,
-                  child: Text('Today', style: TextStyle(color: Colors.grey)),
-                ),
-                SizedBox(height: 16),
-                ChatBubble(
-                  isSender: false,
-                  text: 'Привет! Чем могу вам помочь?',
-                  time: '10:30 AM',
-                ),
-                ChatBubble(isSender: true, text: 'Привет!', time: '10:40 AM'),
-                ChatBubble(
-                  isSender: true,
-                  text: 'У меня заболел кот',
-                  time: '10:40 AM',
-                ),
-              ],
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _chatService.getMessages(widget.chatId),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(child: Text('Произошла ошибка'));
+                }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                return ListView(
+                  reverse: true,
+                  padding: const EdgeInsets.all(16.0),
+                  children: snapshot.data!.docs.map((doc) {
+                    final message = MessageModel.fromDocument(doc);
+                    final isSender = message.senderId == senderId;
+                    return ChatBubble(
+                      isSender: isSender,
+                      text: message.text,
+                    );
+                  }).toList(),
+                );
+              },
             ),
           ),
           _buildMessageComposer(),
@@ -61,18 +104,29 @@ class ChatDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+          )
+        ]
       ),
       child: Row(
         children: [
-          IconButton(icon: const Icon(Icons.attach_file), onPressed: () {}),
-          const Expanded(
+          Expanded(
             child: TextField(
-              decoration: InputDecoration.collapsed(hintText: 'Message'),
+              controller: _messageController,
+              decoration: const InputDecoration.collapsed(
+                hintText: 'Введите сообщение...',
+                hintStyle: TextStyle(color: Colors.grey),
+              ),
+              onSubmitted: (_) => _sendMessage(),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.sentiment_satisfied_alt),
-            onPressed: () {},
+            icon: const Icon(Icons.send, color: Color(0xFFEE8A9A)),
+            onPressed: _sendMessage,
           ),
         ],
       ),
@@ -83,13 +137,11 @@ class ChatDetailScreen extends StatelessWidget {
 class ChatBubble extends StatelessWidget {
   final bool isSender;
   final String text;
-  final String time;
 
   const ChatBubble({
     super.key,
     required this.isSender,
     required this.text,
-    required this.time,
   });
 
   @override
@@ -104,7 +156,7 @@ class ChatBubble extends StatelessWidget {
           borderRadius: BorderRadius.circular(20.0),
         ),
         child: Text(
-          '$text  ',
+          text,
           style: TextStyle(color: isSender ? Colors.white : Colors.black),
         ),
       ),

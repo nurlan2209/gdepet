@@ -16,6 +16,7 @@ class PetModel {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final bool isActive;
+  final List<Map<String, dynamic>> sightings;
 
   PetModel({
     required this.id,
@@ -35,6 +36,7 @@ class PetModel {
     required this.createdAt,
     this.updatedAt,
     this.isActive = true,
+    this.sightings = const [],
   });
 
   factory PetModel.fromJson(Map<String, dynamic> json) {
@@ -62,6 +64,7 @@ class PetModel {
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
       isActive: json['isActive'] ?? true,
+      sightings: List<Map<String, dynamic>>.from(json['sightings'] ?? []),
     );
   }
 
@@ -84,6 +87,7 @@ class PetModel {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'isActive': isActive,
+      'sightings': sightings,
     };
   }
 }

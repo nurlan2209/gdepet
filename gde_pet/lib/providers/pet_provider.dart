@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:geoflutterfire_plus/geoflutterfire_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/pet_model.dart';
 import '../services/pet_service.dart';
 
@@ -18,13 +18,31 @@ class PetProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  Future<bool> addSighting({
+    required String petId,
+    required double latitude,
+    required double longitude,
+    required String userId,
+  }) async {
+    try {
+      final location = GeoPoint(latitude, longitude);
+      await _petService.addSighting(petId, location, userId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Создать объявление
   Future<bool> createPet({
     required String userId,
     required String ownerName,
     required String petName,
     required String description,
-    required List<File> images,
+    required List<XFile> images,
     required PetType type,
     required PetStatus status,
     double? latitude,
@@ -37,14 +55,12 @@ class PetProvider extends ChangeNotifier {
       _setLoading(true);
       _error = null;
 
-      // Генерируем GeoHash если есть координаты
       String? geohash;
       if (latitude != null && longitude != null) {
         final geoPoint = GeoFirePoint(GeoPoint(latitude, longitude));
         geohash = geoPoint.geohash;
       }
 
-      // Создаем временное объявление без фотографий
       final tempPet = PetModel(
         id: '',
         userId: userId,
@@ -63,16 +79,13 @@ class PetProvider extends ChangeNotifier {
         createdAt: DateTime.now(),
       );
 
-      // Создаем объявление
       final petId = await _petService.createPet(tempPet);
 
-      // Загружаем фотографии
       List<String> imageUrls = [];
       if (images.isNotEmpty) {
         imageUrls = await _petService.uploadPetPhotos(petId, images);
       }
 
-      // Обновляем объявление с фотографиями
       final updatedPet = PetModel(
         id: petId,
         userId: userId,
@@ -103,16 +116,11 @@ class PetProvider extends ChangeNotifier {
     }
   }
 
-  // Загрузить все активные объявления
   Future<void> loadPets() async {
     try {
       _setLoading(true);
       _error = null;
-
-      print('PetProvider: Loading all pets...');
       _pets = await _petService.getAllActivePets();
-      print('PetProvider: Loaded ${_pets.length} pets');
-
       _setLoading(false);
     } catch (e) {
       print('PetProvider (loadPets) error: $e');
@@ -121,16 +129,11 @@ class PetProvider extends ChangeNotifier {
     }
   }
 
-  // Загрузить объявления по статусу
   Future<void> loadPetsByStatus(PetStatus status) async {
     try {
       _setLoading(true);
       _error = null;
-
-      print('PetProvider: Loading pets by status: $status');
       _pets = await _petService.getPetsByStatus(status);
-      print('PetProvider: Loaded ${_pets.length} pets with status $status');
-
       _setLoading(false);
     } catch (e) {
       print('PetProvider (loadPetsByStatus) error: $e');
@@ -139,16 +142,11 @@ class PetProvider extends ChangeNotifier {
     }
   }
 
-  // Загрузить объявления пользователя
   Future<void> loadUserPets(String userId) async {
     try {
       _setLoading(true);
       _error = null;
-
-      print('PetProvider: Loading user pets for $userId');
       _userPets = await _petService.getUserPets(userId);
-      print('PetProvider: Loaded ${_userPets.length} user pets');
-
       _setLoading(false);
     } catch (e) {
       print('PetProvider (loadUserPets) error: $e');
@@ -157,14 +155,11 @@ class PetProvider extends ChangeNotifier {
     }
   }
 
-  // Деактивировать объявление
   Future<bool> deactivatePet(String id) async {
     try {
       _setLoading(true);
       _error = null;
-
       await _petService.deactivatePet(id);
-
       _setLoading(false);
       return true;
     } catch (e) {
@@ -175,7 +170,6 @@ class PetProvider extends ChangeNotifier {
     }
   }
 
-  // Поиск объявлений рядом
   Future<void> searchNearbyPets({
     required double latitude,
     required double longitude,
@@ -184,13 +178,11 @@ class PetProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       _error = null;
-
       _pets = await _petService.searchNearbyPets(
         latitude: latitude,
         longitude: longitude,
         radiusKm: radiusKm,
       );
-
       _setLoading(false);
     } catch (e) {
       print('PetProvider (searchNearbyPets) error: $e');
@@ -220,9 +212,7 @@ class PetProvider extends ChangeNotifier {
   try {
     _setLoading(true);
     _error = null;
-
     await _petService.updatePetField(petId, {'isActive': isActive});
-
     _setLoading(false);
     return true;
   } catch (e) {
@@ -233,18 +223,15 @@ class PetProvider extends ChangeNotifier {
   }
 }
 
-// Изменить статус объявления (Пропал/Найден)
 Future<bool> updatePetStatus(String petId, PetStatus newStatus) async {
   try {
     _setLoading(true);
     _error = null;
-
     final statusString = newStatus.toString().split('.').last;
     await _petService.updatePetField(petId, {
       'status': statusString,
       'updatedAt': DateTime.now().toIso8601String(),
     });
-
     _setLoading(false);
     return true;
   } catch (e) {
@@ -255,18 +242,15 @@ Future<bool> updatePetStatus(String petId, PetStatus newStatus) async {
   }
 }
 
-// Отметить питомца как найденного (меняет статус и деактивирует)
 Future<bool> markPetAsFound(String petId) async {
   try {
     _setLoading(true);
     _error = null;
-
     await _petService.updatePetField(petId, {
       'status': 'found',
       'isActive': false,
       'updatedAt': DateTime.now().toIso8601String(),
     });
-
     _setLoading(false);
     return true;
   } catch (e) {
@@ -277,14 +261,11 @@ Future<bool> markPetAsFound(String petId) async {
   }
 }
 
-// Удалить объявление
 Future<bool> deletePet(String petId) async {
   try {
     _setLoading(true);
     _error = null;
-
     await _petService.deletePet(petId);
-
     _setLoading(false);
     return true;
   } catch (e) {
@@ -295,13 +276,12 @@ Future<bool> deletePet(String petId) async {
   }
 }
 
-// Обновить данные объявления
 Future<bool> updatePetData({
   required String petId,
   required String petName,
   required String description,
   required List<String> existingImageUrls,
-  required List<File> newImages,
+  required List<XFile> newImages,
   required PetType type,
   required PetStatus status,
   double? latitude,
@@ -314,23 +294,19 @@ Future<bool> updatePetData({
     _setLoading(true);
     _error = null;
 
-    // Загружаем новые фотографии
     List<String> newImageUrls = [];
     if (newImages.isNotEmpty) {
       newImageUrls = await _petService.uploadPetPhotos(petId, newImages);
     }
 
-    // Объединяем существующие и новые URL
     final allImageUrls = [...existingImageUrls, ...newImageUrls];
 
-    // Генерируем GeoHash если есть координаты
     String? geohash;
     if (latitude != null && longitude != null) {
       final geoPoint = GeoFirePoint(GeoPoint(latitude, longitude));
       geohash = geoPoint.geohash;
     }
 
-    // Обновляем объявление
     await _petService.updatePetField(petId, {
       'petName': petName,
       'description': description,
@@ -356,3 +332,4 @@ Future<bool> updatePetData({
   }
   }
 }
+

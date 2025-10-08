@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -26,7 +26,7 @@ class _EditPetScreenState extends State<EditPetScreen> {
 
   final ImagePicker _picker = ImagePicker();
   List<String> _existingImageUrls = [];
-  List<File> _newImages = [];
+  List<XFile> _newImages = [];
   PetType _selectedType = PetType.cat;
   PetStatus _selectedStatus = PetStatus.lost;
   LatLng? _selectedLocation;
@@ -75,7 +75,7 @@ class _EditPetScreenState extends State<EditPetScreen> {
 
       if (pickedFiles.isNotEmpty) {
         setState(() {
-          _newImages.addAll(pickedFiles.map((xFile) => File(xFile.path)));
+          _newImages.addAll(pickedFiles);
         });
       }
     } catch (e) {
@@ -101,7 +101,7 @@ class _EditPetScreenState extends State<EditPetScreen> {
 
       if (photo != null) {
         setState(() {
-          _newImages.add(File(photo.path));
+          _newImages.add(photo);
         });
       }
     } catch (e) {
@@ -217,6 +217,7 @@ class _EditPetScreenState extends State<EditPetScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        // ... same as before
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -240,8 +241,8 @@ class _EditPetScreenState extends State<EditPetScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Статус
-              const Text(
+              // ... (rest of UI is same)
+               const Text(
                 'Статус',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
@@ -362,8 +363,6 @@ class _EditPetScreenState extends State<EditPetScreen> {
               ),
 
               const SizedBox(height: 24),
-
-              // Кличка
               const Text(
                 'Кличка питомца',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -382,7 +381,6 @@ class _EditPetScreenState extends State<EditPetScreen> {
 
               const SizedBox(height: 24),
 
-              // Описание
               const Text(
                 'Особые приметы',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -405,7 +403,6 @@ class _EditPetScreenState extends State<EditPetScreen> {
 
               const SizedBox(height: 24),
 
-              // Место
               const Text(
                 'Место',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -480,7 +477,6 @@ class _EditPetScreenState extends State<EditPetScreen> {
 
               const SizedBox(height: 24),
 
-              // Контакты
               const Text(
                 'Контактная информация',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -507,7 +503,6 @@ class _EditPetScreenState extends State<EditPetScreen> {
 
               const SizedBox(height: 32),
 
-              // Кнопка сохранения
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -541,7 +536,8 @@ class _EditPetScreenState extends State<EditPetScreen> {
     required PetStatus status,
     required bool isSelected,
   }) {
-    return InkWell(
+    // ... same as before
+     return InkWell(
       onTap: () {
         setState(() {
           _selectedStatus = status;
@@ -571,6 +567,7 @@ class _EditPetScreenState extends State<EditPetScreen> {
   }
 
   Widget _buildExistingPhotoItem(int index) {
+    // ... same as before
     return Container(
       margin: const EdgeInsets.only(right: 8),
       child: Stack(
@@ -623,11 +620,23 @@ class _EditPetScreenState extends State<EditPetScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: Image.file(
-              _newImages[index],
-              width: 150,
-              height: 180,
-              fit: BoxFit.cover,
+            child: FutureBuilder<Uint8List>(
+              future: _newImages[index].readAsBytes(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done && snapshot.hasData) {
+                  return Image.memory(
+                    snapshot.data!,
+                    width: 150,
+                    height: 180,
+                    fit: BoxFit.cover,
+                  );
+                }
+                return const SizedBox(
+                  width: 150,
+                  height: 180,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              },
             ),
           ),
           Positioned(
@@ -674,6 +683,7 @@ class _EditPetScreenState extends State<EditPetScreen> {
   }
 
   Widget _buildAddPhotoButton() {
+    // ... same as before
     return Container(
       width: 150,
       margin: const EdgeInsets.only(right: 8),

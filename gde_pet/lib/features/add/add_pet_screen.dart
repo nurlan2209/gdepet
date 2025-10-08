@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,7 +25,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
   final _telegramController = TextEditingController();
 
   final ImagePicker _picker = ImagePicker();
-  List<File> _images = [];
+  List<XFile> _images = [];
   PetType _selectedType = PetType.cat;
   PetStatus _selectedStatus = PetStatus.lost;
   LatLng? _selectedLocation;
@@ -51,7 +51,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
       if (pickedFiles.isNotEmpty) {
         setState(() {
-          _images.addAll(pickedFiles.map((xFile) => File(xFile.path)));
+          _images.addAll(pickedFiles);
         });
       }
     } catch (e) {
@@ -77,7 +77,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
       if (photo != null) {
         setState(() {
-          _images.add(File(photo.path));
+          _images.add(photo);
         });
       }
     } catch (e) {
@@ -172,7 +172,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
     if (mounted) {
       if (success) {
-        // Перезагружаем данные
         await petProvider.loadUserPets(authProvider.user!.uid);
         await petProvider.loadPets();
         
@@ -183,7 +182,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
           ),
         );
         
-        // ИСПРАВЛЕНИЕ: Просто закрываем экран и возвращаемся назад
         Navigator.of(context).pop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -227,6 +225,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ... (rest of the UI is the same)
               const Text(
                 'Статус',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -549,6 +548,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
     required PetStatus status,
     required bool isSelected,
   }) {
+    // ... same as before
     return InkWell(
       onTap: () {
         setState(() {
@@ -585,11 +585,23 @@ class _AddPetScreenState extends State<AddPetScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: Image.file(
-              _images[index],
-              width: 150,
-              height: 180,
-              fit: BoxFit.cover,
+            child: FutureBuilder<Uint8List>(
+              future: _images[index].readAsBytes(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done && snapshot.hasData) {
+                  return Image.memory(
+                    snapshot.data!,
+                    width: 150,
+                    height: 180,
+                    fit: BoxFit.cover,
+                  );
+                }
+                return const SizedBox(
+                  width: 150,
+                  height: 180,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              },
             ),
           ),
           Positioned(
@@ -617,6 +629,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
   }
 
   Widget _buildAddPhotoButton() {
+    // ... same as before
     return Container(
       width: 150,
       margin: const EdgeInsets.only(right: 8),

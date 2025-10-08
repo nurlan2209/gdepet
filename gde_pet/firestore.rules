@@ -48,7 +48,7 @@ service cloud.firestore {
     
     // Запрет доступа ко всем остальным коллекциям
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true; // Allow all reads and writes
     }
   }
 }
