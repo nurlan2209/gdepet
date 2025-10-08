@@ -43,6 +43,50 @@ class PetService {
     }
   }
 
+
+  Future<void> updatePetField(String id, Map<String, dynamic> fields) async {
+  try {
+    print('PetService: Updating pet fields for ID: $id');
+    print('Fields: $fields');
+    await _firestore.collection('pets').doc(id).update(fields);
+    print('PetService: Pet fields updated successfully');
+  } catch (e) {
+    print('PetService (updatePetField) error: $e');
+    throw 'Ошибка обновления объявления: $e';
+  }
+}
+
+// Удалить объявление
+Future<void> deletePet(String id) async {
+  try {
+    print('PetService: Deleting pet with ID: $id');
+    
+    // Сначала получаем объявление чтобы удалить фотографии
+    final pet = await getPetById(id);
+    
+    if (pet != null && pet.imageUrls.isNotEmpty) {
+      // Удаляем все фотографии из Storage
+      for (String imageUrl in pet.imageUrls) {
+        try {
+          final ref = _storage.refFromURL(imageUrl);
+          await ref.delete();
+          print('PetService: Deleted image: $imageUrl');
+        } catch (e) {
+          print('PetService: Failed to delete image $imageUrl: $e');
+          // Продолжаем даже если не удалось удалить фото
+        }
+      }
+    }
+    
+    // Удаляем документ из Firestore
+    await _firestore.collection('pets').doc(id).delete();
+    print('PetService: Pet deleted successfully');
+  } catch (e) {
+    print('PetService (deletePet) error: $e');
+    throw 'Ошибка удаления объявления: $e';
+  }
+}
+
   // Получить все активные объявления
   Future<List<PetModel>> getAllActivePets() async {
     try {

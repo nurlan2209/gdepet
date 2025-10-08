@@ -215,4 +215,144 @@ class PetProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+  
+  Future<bool> togglePetActive(String petId, bool isActive) async {
+  try {
+    _setLoading(true);
+    _error = null;
+
+    await _petService.updatePetField(petId, {'isActive': isActive});
+
+    _setLoading(false);
+    return true;
+  } catch (e) {
+    print('PetProvider (togglePetActive) error: $e');
+    _error = e.toString();
+    _setLoading(false);
+    return false;
+  }
+}
+
+// Изменить статус объявления (Пропал/Найден)
+Future<bool> updatePetStatus(String petId, PetStatus newStatus) async {
+  try {
+    _setLoading(true);
+    _error = null;
+
+    final statusString = newStatus.toString().split('.').last;
+    await _petService.updatePetField(petId, {
+      'status': statusString,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+
+    _setLoading(false);
+    return true;
+  } catch (e) {
+    print('PetProvider (updatePetStatus) error: $e');
+    _error = e.toString();
+    _setLoading(false);
+    return false;
+  }
+}
+
+// Отметить питомца как найденного (меняет статус и деактивирует)
+Future<bool> markPetAsFound(String petId) async {
+  try {
+    _setLoading(true);
+    _error = null;
+
+    await _petService.updatePetField(petId, {
+      'status': 'found',
+      'isActive': false,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+
+    _setLoading(false);
+    return true;
+  } catch (e) {
+    print('PetProvider (markPetAsFound) error: $e');
+    _error = e.toString();
+    _setLoading(false);
+    return false;
+  }
+}
+
+// Удалить объявление
+Future<bool> deletePet(String petId) async {
+  try {
+    _setLoading(true);
+    _error = null;
+
+    await _petService.deletePet(petId);
+
+    _setLoading(false);
+    return true;
+  } catch (e) {
+    print('PetProvider (deletePet) error: $e');
+    _error = e.toString();
+    _setLoading(false);
+    return false;
+  }
+}
+
+// Обновить данные объявления
+Future<bool> updatePetData({
+  required String petId,
+  required String petName,
+  required String description,
+  required List<String> existingImageUrls,
+  required List<File> newImages,
+  required PetType type,
+  required PetStatus status,
+  double? latitude,
+  double? longitude,
+  String? address,
+  String? contactPhone,
+  String? contactTelegram,
+}) async {
+  try {
+    _setLoading(true);
+    _error = null;
+
+    // Загружаем новые фотографии
+    List<String> newImageUrls = [];
+    if (newImages.isNotEmpty) {
+      newImageUrls = await _petService.uploadPetPhotos(petId, newImages);
+    }
+
+    // Объединяем существующие и новые URL
+    final allImageUrls = [...existingImageUrls, ...newImageUrls];
+
+    // Генерируем GeoHash если есть координаты
+    String? geohash;
+    if (latitude != null && longitude != null) {
+      final geoPoint = GeoFirePoint(GeoPoint(latitude, longitude));
+      geohash = geoPoint.geohash;
+    }
+
+    // Обновляем объявление
+    await _petService.updatePetField(petId, {
+      'petName': petName,
+      'description': description,
+      'imageUrls': allImageUrls,
+      'type': type.toString().split('.').last,
+      'status': status.toString().split('.').last,
+      'latitude': latitude,
+      'longitude': longitude,
+      'geohash': geohash,
+      'address': address,
+      'contactPhone': contactPhone,
+      'contactTelegram': contactTelegram,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+
+    _setLoading(false);
+    return true;
+  } catch (e) {
+    print('PetProvider (updatePetData) error: $e');
+    _error = e.toString();
+    _setLoading(false);
+    return false;
+  }
+  }
 }
