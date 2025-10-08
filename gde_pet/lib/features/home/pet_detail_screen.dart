@@ -22,7 +22,7 @@ class PetDetailScreen extends StatefulWidget {
 
 class _PetDetailScreenState extends State<PetDetailScreen> {
 
-  // Улучшенная функция "Поделиться" с проверками и обработкой ошибок
+// Улучшенная функция "Поделиться" с поддержкой iOS/iPad
 void _sharePet() async {
   try {
     final pet = widget.pet;
@@ -55,62 +55,24 @@ void _sharePet() async {
                  '📱 Приложение: GdePet\n'
                  'Помогите найти или вернуть питомца!';
 
-    // Показываем индикатор загрузки
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
-              SizedBox(width: 16),
-              Text('Открытие меню поделиться...'),
-            ],
-          ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    // Получаем размер экрана для позиционирования на iPad
+    final box = context.findRenderObject() as RenderBox?;
+    final sharePositionOrigin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
 
-    // Share.share открывает системное меню "Поделиться"
+    // Share.share с указанием позиции для iPad
     await Share.share(
       text,
       subject: '$statusText ${pet.type.displayName} "${pet.petName}"',
+      sharePositionOrigin: sharePositionOrigin,
     );
-
-    // Убираем индикатор загрузки и показываем сообщение
-    if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      
-      // Небольшая задержка, чтобы пользователь успел поделиться
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.share, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Спасибо за помощь! 💙'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    }
+    
+    print('Share dialog opened successfully');
+    
   } catch (e) {
     print('Error sharing: $e');
     if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -118,7 +80,7 @@ void _sharePet() async {
               const Icon(Icons.error_outline, color: Colors.white),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Не удалось поделиться: ${e.toString()}'),
+                child: Text('Не удалось открыть меню: ${e.toString()}'),
               ),
             ],
           ),
@@ -134,6 +96,7 @@ void _sharePet() async {
     }
   }
 }
+
 Future<void> _callForHelp() async {
   final pet = widget.pet;
   

@@ -59,7 +59,7 @@ class PetService {
       throw 'Ошибка добавления отметки: $e';
     }
   }
-  
+
   Future<void> _sendSightingNotification(
     String petId, 
     String sighterId, 
@@ -133,6 +133,13 @@ class PetService {
           'longitude': location.longitude,
         }
       });
+      await _createNotification(
+        userId: ownerId,
+        type: 'sighting',
+        title: '👀 Кто-то видел вашего питомца!',
+        message: '$sighterName видел(а) "$petName". Проверьте чат для подробностей.',
+        petId: petId,
+      );
       
       // Обновляем последнее сообщение в чате
       await _firestore.collection('chats').doc(chatId).update({
@@ -162,6 +169,28 @@ class PetService {
     } catch (e) {
       print('PetService (createPet) error: $e');
       throw 'Ошибка создания объявления: $e';
+    }
+  }
+  Future<void> _createNotification({
+    required String userId,
+    required String type,
+    required String title,
+    required String message,
+    String? petId,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'type': type,
+        'title': title,
+        'message': message,
+        'petId': petId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'isRead': false,
+      });
+      print('Notification created successfully');
+    } catch (e) {
+      print('Error creating notification: $e');
     }
   }
 
